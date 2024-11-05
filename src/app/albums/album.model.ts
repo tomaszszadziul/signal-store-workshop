@@ -9,6 +9,13 @@ export type Album = {
   coverImage: string;
 };
 
+export interface AlbumState {
+  albums: Album[];
+  query: string;
+  order: SortOrder;
+  showProgress: boolean
+}
+
 export function searchAlbums(albums: Album[], query: string): Album[] {
   return albums.filter(({ title }) => title.toLowerCase().includes(query));
 }
