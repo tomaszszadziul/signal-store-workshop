@@ -13,6 +13,9 @@ import { AlbumsService } from '@/albums/albums.service';
 import { Album, searchAlbums, sortAlbums } from '@/albums/album.model';
 import { AlbumFilterComponent } from './album-filter/album-filter.component';
 import { AlbumListComponent } from './album-list/album-list.component';
+import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { EMPTY, exhaustMap, pipe, tap } from 'rxjs';
+import { tapResponse } from '@ngrx/operators';
 
 @Component({
   selector: 'ngrx-album-search',
@@ -39,6 +42,7 @@ import { AlbumListComponent } from './album-list/album-list.component';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
+
 export default class AlbumSearchComponent implements OnInit {
   readonly #albumsService = inject(AlbumsService);
   readonly #snackBar = inject(MatSnackBar);
@@ -63,18 +67,28 @@ export default class AlbumSearchComponent implements OnInit {
   );
   readonly totalAlbums = computed(() => this.filteredAlbums().length);
 
+  readonly loadAllAlbums = rxMethod<void>(
+    pipe(
+      tap(() => patchState(this.state, { showProgress: true })),
+      exhaustMap((albumsService) => this.#albumsService.getAll().pipe(
+        tapResponse({
+          next: (albums) => {
+            patchState(this.state, { albums });
+          },
+          error: (error: { message: string }) => {
+            patchState(this.state, { showProgress: false });
+            this.#snackBar.open('Error loading albums', 'Close', {
+              duration: 3000,
+            });
+          }
+        })
+      ))
+    )
+    )
+
   ngOnInit(): void {
     patchState(this.state, { showProgress: true });
-
-    this.#albumsService.getAll().subscribe({
-      next: (albums) => {
-        patchState(this.state, { albums, showProgress: false });
-      },
-      error: (error: { message: string }) => {
-        this.#snackBar.open(error.message, 'Close', { duration: 5_000 });
-        patchState(this.state, { showProgress: false });
-      },
-    });
+    this.loadAllAlbums();
   }
 
   updateQuery(query: string): void {
